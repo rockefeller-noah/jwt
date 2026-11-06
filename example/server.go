@@ -1,129 +1,86 @@
 package main
 
 import (
+	"context"
+	"errors"
+	"flag"
+	"fmt"
+	"log"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
-	"github.com/dobyte/jwt"
-	"github.com/gogf/gcache-adapter/adapter"
-	"github.com/gogf/gf/database/gredis"
-	"github.com/gogf/gf/frame/g"
-	"github.com/gogf/gf/net/ghttp"
+	"example/internal/demo"
+	"github.com/rockefeller-noah/jwt"
 )
-
-type Response struct {
-	Status  int    `json:"status"`
-	Message string `json:"message"`
-	Data    any    `json:"data"`
-}
-
-var (
-	auth    *jwt.JWT
-	payload = jwt.Payload{
-		"uid":     1,
-		"account": "fuxiao",
-	}
-)
-
-func init() {
-	gredis.SetConfig(&gredis.Config{
-		Host: "127.0.0.1",
-		Port: 6379,
-		Db:   1,
-	}, "jwt")
-
-	auth, _ = jwt.NewJWT(
-		jwt.WithIssuer("backend"),
-		jwt.WithSignAlgorithm(jwt.HS256),
-		jwt.WithSecretKey("secret"),
-		jwt.WithValidDuration(3600),
-		jwt.WithLookupLocations("header:Authorization"),
-		jwt.WithStore(adapter.NewRedis(g.Redis("jwt"))),
-	)
-}
-
-func failed(r *ghttp.Request, status int, message string) {
-	_ = r.Response.WriteJsonExit(Response{
-		Status:  status,
-		Message: message,
-	})
-}
-
-func success(r *ghttp.Request, message string, data any) {
-	_ = r.Response.WriteJsonExit(Response{
-		Status:  http.StatusOK,
-		Message: message,
-		Data:    data,
-	})
-}
-
-func middleware(r *ghttp.Request) {
-	request, err := auth.Http().Middleware(r.Request)
-	if err != nil {
-		switch {
-		case jwt.IsInvalidToken(err):
-			failed(r, http.StatusUnauthorized, "token is invalid")
-		case jwt.IsExpiredToken(err):
-			failed(r, http.StatusUnauthorized, "token is expired")
-		case jwt.IsMissingToken(err):
-			failed(r, http.StatusUnauthorized, "token is missing")
-		case jwt.IsAuthElsewhere(err):
-			failed(r, http.StatusUnauthorized, "auth elsewhere")
-		default:
-			failed(r, http.StatusUnauthorized, "unauthorized")
-		}
-	}
-
-	r.Request = request
-
-	r.Middleware.Next()
-}
 
 func main() {
-	s := g.Server()
+	if err := run(); err != nil {
+		log.Print(err)
+		os.Exit(1)
+	}
+}
 
-	s.Group("", func(group *ghttp.RouterGroup) {
-		// login
-		group.POST("/login", func(r *ghttp.Request) {
-			token, err := auth.GenerateToken("1", payload)
-			if err != nil {
-				failed(r, http.StatusBadRequest, err.Error())
+func run() error {
+	var cfg demo.StoreConfig
+	listen := flag.String("listen", "127.0.0.1:8888", "HTTP listen address")
+	flag.StringVar(&cfg.Driver, "store", "redisv9", "redisv8, redisv9, gozero, goframe, or none")
+	flag.StringVar(&cfg.Addrs, "redis-addrs", "127.0.0.1:6379", "comma-separated Redis host:port addresses")
+	flag.IntVar(&cfg.DB, "redis-db", 0, "Redis database; clusters and go-zero require 0")
+	flag.BoolVar(&cfg.Cluster, "cluster", false, "use Redis Cluster (v8, v9, or go-zero)")
+	flag.Parse()
+	cfg.Username = os.Getenv("REDIS_USERNAME")
+	cfg.Password = os.Getenv("REDIS_PASSWORD")
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		return fmt.Errorf("set JWT_SECRET before starting the example")
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+	startup, cancel := context.WithTimeout(ctx, 5*time.Second)
+	store, cleanup, err := demo.OpenStore(startup, cfg)
+	cancel()
+	if err != nil {
+		return fmt.Errorf("initialize store: %w", err)
+	}
+	defer cleanup()
+	auth, err := jwt.NewJWT(
+		jwt.WithIssuer("jwt-example"),
+		jwt.WithSecretKey(secret),
+		jwt.WithValidDuration(time.Hour),
+		jwt.WithRefreshDuration(time.Hour),
+		jwt.WithLookupLocations("header:Authorization"),
+		jwt.WithStore(store),
+	)
+	if err != nil {
+		return fmt.Errorf("initialize JWT: %w", err)
+	}
+	server := &http.Server{
+		Addr: *listen, Handler: demo.NewHandler(auth, store != nil),
+		ReadHeaderTimeout: 5 * time.Second,
+	}
+	stopped := make(chan struct{})
+	shutdownDone := make(chan struct{})
+	defer close(stopped)
+	go func() {
+		defer close(shutdownDone)
+		select {
+		case <-ctx.Done():
+			shutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+			defer cancel()
+			if err := server.Shutdown(shutdown); err != nil {
+				log.Printf("HTTP shutdown: %v", err)
+				_ = server.Close()
 			}
-
-			success(r, "login success", token)
-		})
-
-		// logout
-		group.DELETE("/logout", func(r *ghttp.Request) {
-			if err := auth.Http().DestroyToken(r.Request); err != nil {
-				failed(r, http.StatusBadRequest, err.Error())
-			}
-
-			success(r, "logout success", nil)
-		})
-
-		// refresh token
-		group.PUT("/refresh", func(r *ghttp.Request) {
-			token, err := auth.Http().RefreshToken(r.Request)
-			if err != nil {
-				failed(r, http.StatusBadRequest, err.Error())
-			}
-
-			success(r, "refresh success", token)
-		})
-
-		group.Middleware(middleware)
-
-		// get user profile information
-		group.GET("/profile", func(r *ghttp.Request) {
-			info, err := auth.Http().ParseToken(r.Request)
-			if err != nil {
-				failed(r, http.StatusBadRequest, err.Error())
-			}
-
-			success(r, "get profile success", info)
-		})
-	})
-
-	s.SetPort(8888)
-	s.Run()
+		case <-stopped:
+		}
+	}()
+	log.Printf("JWT example listening on http://%s (store=%s, cluster=%t)", *listen, cfg.Driver, cfg.Cluster)
+	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	<-shutdownDone
+	return nil
 }

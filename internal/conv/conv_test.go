@@ -12,7 +12,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dobyte/jwt/internal/conv"
+	"github.com/rockefeller-noah/jwt/internal/conv"
 )
 
 type student struct {

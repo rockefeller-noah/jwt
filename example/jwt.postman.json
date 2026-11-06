@@ -1,117 +1,73 @@
 {
-	"info": {
-		"_postman_id": "9edcd21c-7f0e-48ca-a0a9-f9e1aa4b881c",
-		"name": "jwt",
-		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
-	},
-	"item": [
-		{
-			"name": "profile",
-			"request": {
-				"auth": {
-					"type": "bearer",
-					"bearer": [
-						{
-							"key": "token",
-							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50IjoiZnV4aWFvIiwiZXhwIjoxNjE3MjY3Mzc1LCJpZCI6MSwib3JpZ19pYXQiOjE2MTcyNjM3NzUsInVpYyI6IjF3amk4MzdjZ3MwY2FjODV0cXBkdDc0MTAwNTdrZ251In0.5mvWedVy2cHN-3__uc16sLlkRaOm_zGwv9jTAix2f4o",
-							"type": "string"
-						}
-					]
-				},
-				"method": "GET",
-				"header": [],
-				"url": {
-					"raw": "http://127.0.0.1:8888/profile",
-					"protocol": "http",
-					"host": [
-						"127",
-						"0",
-						"0",
-						"1"
-					],
-					"port": "8888",
-					"path": [
-						"profile"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "refresh",
-			"request": {
-				"method": "PUT",
-				"header": [],
-				"url": {
-					"raw": "http://127.0.0.1:8888/refresh",
-					"protocol": "http",
-					"host": [
-						"127",
-						"0",
-						"0",
-						"1"
-					],
-					"port": "8888",
-					"path": [
-						"refresh"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "login",
-			"request": {
-				"method": "POST",
-				"header": [],
-				"url": {
-					"raw": "http://127.0.0.1:8888/login",
-					"protocol": "http",
-					"host": [
-						"127",
-						"0",
-						"0",
-						"1"
-					],
-					"port": "8888",
-					"path": [
-						"login"
-					]
-				}
-			},
-			"response": []
-		},
-		{
-			"name": "logout",
-			"request": {
-				"auth": {
-					"type": "bearer",
-					"bearer": [
-						{
-							"key": "token",
-							"value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2NvdW50IjoiZnV4aWFvIiwiZXhwIjoxNjE3MjY3Mzc1LCJpZCI6MSwib3JpZ19pYXQiOjE2MTcyNjM3NzUsInVpYyI6IjF3amk4MzdjZ3MwY2FjODV0cXBkdDc0MTAwNTdrZ251In0.5mvWedVy2cHN-3__uc16sLlkRaOm_zGwv9jTAix2f4o",
-							"type": "string"
-						}
-					]
-				},
-				"method": "DELETE",
-				"header": [],
-				"url": {
-					"raw": "http://127.0.0.1:8888/logout",
-					"protocol": "http",
-					"host": [
-						"127",
-						"0",
-						"0",
-						"1"
-					],
-					"port": "8888",
-					"path": [
-						"logout"
-					]
-				}
-			},
-			"response": []
-		}
-	]
+  "info": {"name": "JWT example", "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json", "description": "Start example/server.go with a Redis-backed store. Run requests in order; login and refresh save the token automatically. Demo credentials: demo / demo-password."},
+  "variable": [{"key": "base_url", "value": "http://127.0.0.1:8888", "type": "string"}, {"key": "token", "value": "", "type": "string"}],
+  "auth": {"type": "bearer", "bearer": [{"key": "token", "value": "{{token}}", "type": "string"}]},
+  "item": [
+    {
+      "name": "Health",
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });", "pm.test(\"JSON status matches HTTP\", function () { pm.expect(pm.response.json().status).to.eql(pm.response.code); });"]}}],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/healthz",
+        "auth": {"type": "noauth"}
+      }
+    },
+    {
+      "name": "Login",
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });", "pm.test(\"JSON status matches HTTP\", function () { pm.expect(pm.response.json().status).to.eql(pm.response.code); });", "if (pm.response.code === 200) {", "  pm.collectionVariables.set(\"token\", pm.response.json().data.token);", "}"]}}],
+      "request": {
+        "method": "POST",
+        "header": [{"key": "Content-Type", "value": "application/json"}],
+        "url": "{{base_url}}/login",
+        "auth": {"type": "noauth"},
+        "body": {"mode": "raw", "raw": "{\"account\":\"demo\",\"password\":\"demo-password\"}", "options": {"raw": {"language": "json"}}}
+      }
+    },
+    {
+      "name": "Profile",
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });", "pm.test(\"JSON status matches HTTP\", function () { pm.expect(pm.response.json().status).to.eql(pm.response.code); });"]}}],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/profile"
+      }
+    },
+    {
+      "name": "Refresh",
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });", "pm.test(\"JSON status matches HTTP\", function () { pm.expect(pm.response.json().status).to.eql(pm.response.code); });", "if (pm.response.code === 200) {", "  pm.collectionVariables.set(\"token\", pm.response.json().data.token);", "}"]}}],
+      "request": {
+        "method": "PUT",
+        "header": [],
+        "url": "{{base_url}}/refresh"
+      }
+    },
+    {
+      "name": "Profile with refreshed token",
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });", "pm.test(\"JSON status matches HTTP\", function () { pm.expect(pm.response.json().status).to.eql(pm.response.code); });"]}}],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/profile"
+      }
+    },
+    {
+      "name": "Logout",
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"HTTP 200\", function () { pm.response.to.have.status(200); });", "pm.test(\"JSON status matches HTTP\", function () { pm.expect(pm.response.json().status).to.eql(pm.response.code); });"]}}],
+      "request": {
+        "method": "DELETE",
+        "header": [],
+        "url": "{{base_url}}/logout"
+      }
+    },
+    {
+      "name": "Profile after logout (expect 401)",
+      "event": [{"listen": "test", "script": {"type": "text/javascript", "exec": ["pm.test(\"HTTP 401\", function () { pm.response.to.have.status(401); });", "pm.test(\"JSON status matches HTTP\", function () { pm.expect(pm.response.json().status).to.eql(pm.response.code); });"]}}],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/profile"
+      }
+    }
+  ]
 }

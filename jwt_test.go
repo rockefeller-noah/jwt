@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dobyte/jwt"
+	"github.com/rockefeller-noah/jwt"
 )
 
 var (
@@ -18,7 +18,7 @@ func init() {
 		jwt.WithIssuer("backend"),
 		jwt.WithSignAlgorithm(jwt.HS256),
 		jwt.WithSecretKey("secret"),
-		jwt.WithValidDuration(3600),
+		jwt.WithValidDuration(time.Hour),
 		jwt.WithLookupLocations("header:Authorization"),
 	)
 

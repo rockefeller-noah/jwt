@@ -3,7 +3,7 @@ package jwt
 import (
 	"time"
 
-	"github.com/dobyte/jwt/internal/conv"
+	"github.com/rockefeller-noah/jwt/internal/conv"
 )
 
 const (

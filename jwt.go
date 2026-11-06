@@ -10,8 +10,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dobyte/jwt/internal/conv"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rockefeller-noah/jwt/internal/conv"
 )
 
 const (
@@ -32,6 +32,15 @@ type JWT struct {
 	signingMethod jwt.SigningMethod
 	once          sync.Once
 	http          *Http
+}
+
+func MustJWT(opts ...Option) *JWT {
+	newJWT, err := NewJWT(opts...)
+	if err != nil {
+		panic(err)
+	}
+
+	return newJWT
 }
 
 func NewJWT(opts ...Option) (*JWT, error) {
